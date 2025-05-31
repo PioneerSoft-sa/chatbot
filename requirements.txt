@@ -1,9 +1,13 @@
 # FastAPI with standard dependencies
 fastapi[standard]
 
+# AI
+langchain[openai]
+chromadb==1.0.12
+
 # Database dependencies
 sqlalchemy==2.0.41
 psycopg2-binary==2.9.10
 
-# Additional dependencies for our project
+# Additional dependencies
 pydantic==2.11.5
