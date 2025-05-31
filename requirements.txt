@@ -1,0 +1,9 @@
+# FastAPI with standard dependencies
+fastapi[standard]
+
+# Database dependencies
+sqlalchemy==2.0.41
+psycopg2-binary==2.9.10
+
+# Additional dependencies for our project
+pydantic==2.11.5
