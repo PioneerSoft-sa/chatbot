@@ -1,6 +1,5 @@
 import os
 import chromadb
-from chromadb.config import Settings
 from chromadb.utils.embedding_functions import OpenAIEmbeddingFunction
 from dotenv import load_dotenv
 from typing import List, Dict
@@ -27,7 +26,7 @@ class VectorStore:
     def _get_or_create_collection(self, name: str, embedding_fn=None):
         try:
             # First try to get existing collection
-            collection = self.client.get_collection(name)
+            collection = self.client.get_collection(name, embedding_function=embedding_fn)
             print(f"Found existing collection: {name}")
             return collection
         except Exception as e:
@@ -133,7 +132,7 @@ def populate_initial_data():
     
     vector_store.add_schema_info(
         "batch_tracking",
-        "Table: batch_tracking, Columns: id(int), batch_id(FK), location(string), status(enum: Manufactured/In Transit/Delivered), timestamp(datetime), handled_by(FK)",
+        "Table: batch_tracking, Columns: id(int), batch_id(FK), location(string), status(enum: MANUFACTURED/IN_TRANSIT/DELIVERED), timestamp(datetime), handled_by(FK)",
         "Real-time batch location and status tracking with employee handling info"
     )
     

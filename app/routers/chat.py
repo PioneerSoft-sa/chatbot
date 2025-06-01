@@ -22,7 +22,7 @@ async def get_chat():
     return {"message": "Hello, How can I help you today?"}
 
 @router.post("/")
-def post_chat(user_input: schemas.ChatQuery, db: Session = Depends(get_db)):
+def chat_response(user_input: schemas.ChatQuery, db: Session = Depends(get_db)):
     results = vector_store.search_schema(user_input.query, n_results=3)
 
     if not results:
@@ -47,8 +47,7 @@ def post_chat(user_input: schemas.ChatQuery, db: Session = Depends(get_db)):
         Respond in JSON:
         {{
             "type": "sql" | "generic" | "out_of_scope" | "need_more_info",
-            "component": "table" | "text" | "number" | "pie_chart" | "bar_chart",
-            "text": "Explanation for the query or result",
+            "text": "Natural language explanation or response for UI display",
             "sql": "SELECT ..."
         }}
     """
@@ -61,23 +60,23 @@ def post_chat(user_input: schemas.ChatQuery, db: Session = Depends(get_db)):
     response = model(messages).content
 
     try:
-        parsed = json.loads(response)
+        data = json.loads(response)
 
-        if parsed['type'] == 'sql':
-            result = db.execute(text(parsed['sql']))
+        if data['type'] == 'sql':
+            result = db.execute(text(data['sql']))
             rows = result.fetchall()
             columns = result.keys()
             result_data = [dict(zip(columns, row)) for row in rows]
-            parsed["result"] = result_data
-            return {"response": parsed}
+            data["result"] = result_data
+            return {"response": data}
         else:
-            return {"response": parsed}
+            return {"response": data}
 
     except json.JSONDecodeError:
         raise HTTPException(status_code=500, detail="Model response could not be parsed as JSON")
 
 
 @router.get("/vectors/schemas")
-def get_schemas():
-    return vector_store.schema_collection.get()
+def get_schemas(id: str = None):
+    return vector_store.schema_collection.get(ids = id or None)
 
