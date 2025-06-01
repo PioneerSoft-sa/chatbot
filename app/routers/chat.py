@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from langchain.chat_models import init_chat_model
-from langchain.schema import SystemMessage, HumanMessage
+from langchain.schema import SystemMessage, HumanMessage, AIMessage
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 import json
@@ -8,8 +8,12 @@ import json
 from app.config import schemas
 from app.config.database import get_db
 from app.config.vector_store import vector_store
+from app.utils.redis_utils import get_chat_history, append_to_chat_history
 
-model = init_chat_model("gpt-4.1-mini", model_provider="openai")
+model = init_chat_model("gpt-4.1", model_provider="openai")
+
+# Redis: mock user id for now
+user_id = "12334245"
 
 router = APIRouter(
     prefix="/chat",
@@ -19,27 +23,40 @@ router = APIRouter(
 
 @router.get("/")
 async def get_chat():
-    return {"message": "Hello, How can I help you today?"}
+    chat_history = get_chat_history(user_id)
+    return chat_history
 
 @router.post("/")
 def chat_response(user_input: schemas.ChatQuery, db: Session = Depends(get_db)):
     results = vector_store.search_schema(user_input.query, n_results=3)
-
     if not results:
         return {
             "response": {
                 "type": "need_more_info",
-                "component": "text",
                 "text": "Sorry, I couldn't find any relevant schema information.",
-                "sql": None
             }
         }
 
     schema_context = "\n".join([f"{r['document']}" for r in results])
 
     prompt = f"""
-        You are a SQL expert. Generate a valid SELECT SQL query based on the following schemas:
+        You are 'Lark AI', an intelligent chatbot assistant integrated into an organization's dashboard.
+        Users will ask questions in **natural language**, and possibly ask **follow-up questions** based on earlier parts of the conversation.
 
+        Task:
+        - If it is a **generic question**, reply with a helpful message and set "type" as "generic".
+        - If it is a **question about organizational data**, analyze it and generate a valid SQL query and respond with "type" as "sql".
+        - If the query is **out of scope**, set "type": "out_of_scope" and reply appropriately.
+        - If you need **more information** to proceed, respond with "type": "need_more_info" and ask the user what you need.
+
+        SQL Guidelines:
+        - Only generate valid SELECT SQL queries.
+        - Format dates in "DD-MM-YYYY" format.
+        - Select only relevant columns.
+        - Translate vague time expressions (e.g., "this quarter" → actual dates)
+        - Join tables when necessary.
+
+        Schemas:
         {schema_context}
 
         User question: "{user_input.query}"
@@ -47,21 +64,33 @@ def chat_response(user_input: schemas.ChatQuery, db: Session = Depends(get_db)):
         Respond in JSON:
         {{
             "type": "sql" | "generic" | "out_of_scope" | "need_more_info",
+            "component": "table" | "text" | "number" | "pie_chart" | "bar_chart",
             "text": "Natural language explanation or response for UI display",
             "sql": "SELECT ..."
         }}
     """
 
-    messages = [
-        SystemMessage(content="You are a helpful assistant that writes SQL."),
-        HumanMessage(content=prompt)
-    ]
+    messages = [SystemMessage(content="You are a helpful assistant that writes SQL."),]
+    chat_histoy = get_chat_history(user_id)
+    
+    # Add chat history to messages
+    for message in chat_histoy:
+        if message["role"] == "user":
+            messages.append(HumanMessage(content=message["content"]))
+        elif message["role"] == "assistant":
+            messages.append(AIMessage(content= json.dumps(message["content"])))
 
+    messages.append(HumanMessage(content=prompt))
     response = model(messages).content
+    # print(response)
 
     try:
         data = json.loads(response)
-
+        
+        # Store the chat history in Redis
+        append_to_chat_history(user_id, {"role": "user", "content": user_input.query})
+        append_to_chat_history(user_id, {"role": "assistant", "content": data})
+        
         if data['type'] == 'sql':
             result = db.execute(text(data['sql']))
             rows = result.fetchall()
