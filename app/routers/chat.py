@@ -37,7 +37,7 @@ def chat_response(user_input: schemas.ChatQuery, db: Session = Depends(get_db)):
             }
         }
 
-    schema_context = "\n".join([f"{r['document']}" for r in results])
+    schema_context = "\n".join([f"{r['document'] }, Description: {r['metadata']['description']}" for r in results])
 
     prompt = f"""
         You are 'Lark AI', an intelligent chatbot assistant integrated into an organization's dashboard.
@@ -48,6 +48,7 @@ def chat_response(user_input: schemas.ChatQuery, db: Session = Depends(get_db)):
         - If it is a **question about organizational data**, analyze it and generate a valid SQL query and respond with "type" as "sql".
         - If the query is **out of scope**, set "type": "out_of_scope" and reply appropriately.
         - If you need **more information** to proceed, respond with "type": "need_more_info" and ask the user what you need.
+        - If you can **fully answer** the question based on the context, respond with "type": "generic" and provide a natural language response.
 
         SQL Guidelines:
         - Only generate valid SELECT SQL queries.
@@ -55,11 +56,10 @@ def chat_response(user_input: schemas.ChatQuery, db: Session = Depends(get_db)):
         - Select only relevant columns.
         - Translate vague time expressions (e.g., "this quarter" → actual dates)
         - Join tables when necessary.
+        - SQL should be compatible with Python SQLAlchemy and Postgres and ready to run via: db.execute(text(sql_query)) 
 
         Schemas:
         {schema_context}
-
-        User question: "{user_input.query}"
 
         Respond in JSON:
         {{
@@ -70,7 +70,7 @@ def chat_response(user_input: schemas.ChatQuery, db: Session = Depends(get_db)):
         }}
     """
 
-    messages = [SystemMessage(content="You are a helpful assistant that writes SQL."),]
+    messages = [SystemMessage(content=prompt)]
     chat_histoy = get_chat_history(user_id)
     
     # Add chat history to messages
@@ -80,7 +80,7 @@ def chat_response(user_input: schemas.ChatQuery, db: Session = Depends(get_db)):
         elif message["role"] == "assistant":
             messages.append(AIMessage(content= json.dumps(message["content"])))
 
-    messages.append(HumanMessage(content=prompt))
+    messages.append(HumanMessage(content=user_input.query))
     response = model(messages).content
     # print(response)
 
