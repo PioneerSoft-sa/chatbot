@@ -5,7 +5,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 import json
 
-from app.config import schemas
+from app.utils import schemas
 from app.config.database import get_db
 from app.config.vector_store import vector_store
 from app.utils.redis_utils import get_chat_history, append_to_chat_history
@@ -28,7 +28,7 @@ async def get_chat():
 
 @router.post("/")
 def chat_response(user_input: schemas.ChatQuery, db: Session = Depends(get_db)):
-    results = vector_store.search_schema(user_input.query, n_results=3)
+    results = vector_store.search_schema(user_input.query, n_results=4)
     if not results:
         return {
             "response": {
@@ -37,7 +37,7 @@ def chat_response(user_input: schemas.ChatQuery, db: Session = Depends(get_db)):
             }
         }
 
-    schema_context = "\n".join([f"{r['document'] }, Description: {r['metadata']['description']}" for r in results])
+    schema_context = "\n".join([f"{r['metadata']['schema']}, Description: {r['document']}" for r in results])
 
     prompt = f"""
 You are 'Lark AI', an intelligent chatbot assistant integrated into an organization's dashboard.
@@ -114,19 +114,18 @@ Respond in JSON:
     try:
         data = json.loads(response)
         
-        # Store the chat history in Redis
-        append_to_chat_history(user_id, {"role": "user", "content": user_input.query})
-        append_to_chat_history(user_id, {"role": "assistant", "content": data})
-        
         if data['type'] == 'sql':
             result = db.execute(text(data['sql']))
             rows = result.fetchall()
             columns = result.keys()
             result_data = [dict(zip(columns, row)) for row in rows]
             data["result"] = result_data
-            return {"response": data}
-        else:
-            return {"response": data}
+
+        # Store the chat history in Redis
+        append_to_chat_history(user_id, {"role": "user", "content": user_input.query})
+        append_to_chat_history(user_id, {"role": "assistant", "content": data})
+        
+        return {"response": data}
 
     except json.JSONDecodeError:
         raise HTTPException(status_code=500, detail="Model response could not be parsed as JSON")
