@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from langchain.chat_models import init_chat_model
 from langchain.schema import SystemMessage, HumanMessage, AIMessage
 from sqlalchemy import text
@@ -8,6 +8,7 @@ import json
 from app.utils import schemas
 from app.config.database import get_db
 from app.config.vector_store import vector_store
+from app.utils.prompt_utils import get_prompt, get_final_rag_prompt
 from app.utils.redis_utils import get_chat_history, append_to_chat_history
 
 model = init_chat_model("gpt-4.1", model_provider="openai")
@@ -27,7 +28,11 @@ async def get_chat():
     return chat_history
 
 @router.post("/")
-def chat_response(user_input: schemas.ChatQuery, db: Session = Depends(get_db)):
+def chat_response(
+    user_input: schemas.ChatQuery,
+    rag: bool = Query(False, description="Use RAG-based response"),
+    db: Session = Depends(get_db)
+):
     results = vector_store.search_schema(user_input.query, n_results=4)
     if not results:
         return {
@@ -39,63 +44,7 @@ def chat_response(user_input: schemas.ChatQuery, db: Session = Depends(get_db)):
 
     schema_context = "\n".join([f"{r['metadata']['schema']}, Description: {r['document']}" for r in results])
 
-    prompt = f"""
-You are 'Lark AI', an intelligent chatbot assistant integrated into an organization's dashboard.
-Users will ask questions in **natural language**, and possibly ask **follow-up questions** based on earlier parts of the conversation.
-
-Task:
-- If it is a **generic question**, reply with a helpful message and set "type" as "generic".
-- If it is a **question about organizational data**, analyze it and generate a valid SQL query and respond with "type" as "sql".
-- If the query is **out of scope**, set "type": "out_of_scope" and reply appropriately.
-- If you need **more information** to proceed, respond with "type": "need_more_info" and ask the user what you need.
-- If you can **fully answer** the question based on the context, respond with "type": "generic" and provide a natural language response.
-
-SQL Guidelines:
-- Only generate valid SELECT SQL queries.
-- Format dates in "DD-MM-YYYY" format.
-- Select only relevant columns.
-- Translate vague time expressions (e.g., "this quarter" → actual dates)
-- Join tables when necessary.
-- SQL should be compatible with Python SQLAlchemy and Postgres and ready to run via: db.execute(text(sql_query)) 
-
-Error Handling & Accuracy Requirements:
-1. **Spelling Flexibility**:
-   - Tolerate minor spelling mistakes (e.g., "Softwear Engineer" → "Software Engineer")
-   - Correct common abbreviations (e.g., "PM" → "Product Manager", "SE" → "Software Engineer")
-   - For ambiguous terms, ask the user for clarification.
-
-2. **Data Validation**:
-   - Validate values such as known roles, departments, companies, or regions.
-   - Reject impossible queries (e.g., "users from Mars").
-   - Translate vague time expressions accurately (e.g., "this quarter", "last month").
-
-3. **Edge Case Handling**:
-   - Empty results are valid as long as the SQL is correct.
-   - Warn the user if a query could return a very large result set.
-   - Handle special characters in names and emails correctly.
-
-Scope Constraints:
-You must not respond to vague or out-of-scope queries like:
-- "Show me *"
-- "Find all things related to *"
-- "What's trending now?"
-
-Instead, respond with:
-- "I'm sorry, I need more specific information to assist you."
-- "This query appears to be outside the current scope of supported questions."
-
-Schemas:
-{schema_context}
-
-Respond in JSON:
-{{
-    "type": "sql" | "generic" | "out_of_scope" | "need_more_info",
-    "component": "table" | "text" | "number" | "pie_chart" | "bar_chart",
-    "text": "Natural language explanation or response for UI display",
-    "sql": "SELECT ..."
-}}
-"""
-
+    prompt = get_prompt(schema_context)
 
     messages = [SystemMessage(content=prompt)]
     chat_histoy = get_chat_history(user_id)
@@ -120,6 +69,12 @@ Respond in JSON:
             columns = result.keys()
             result_data = [dict(zip(columns, row)) for row in rows]
             data["result"] = result_data
+            
+            if rag:
+                rag_prompt = get_final_rag_prompt(user_input.query, data)
+                print(rag_prompt)
+                response = model.predict(text=rag_prompt)
+                data = json.loads(response)
 
         # Store the chat history in Redis
         append_to_chat_history(user_id, {"role": "user", "content": user_input.query})
