@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 import os
@@ -12,6 +12,14 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 
 # Create SQLAlchemy engine
 engine = create_engine(DATABASE_URL)
+
+# Test the DB connection
+try:
+    with engine.connect() as connection:
+        connection.execute(text("SELECT 1"))
+        print("✅ Database connected successfully")
+except Exception as e:
+    print("❌ Database connection failed:", e)
 
 # Create SessionLocal class
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
