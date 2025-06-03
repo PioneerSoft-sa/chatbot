@@ -2,7 +2,7 @@ from sqlalchemy import Column, Integer, String, DateTime, Date, Float, ForeignKe
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 import enum
-from .database import Base
+from ..config.database import Base
 
 # Enum for batch status
 class BatchStatus(enum.Enum):
