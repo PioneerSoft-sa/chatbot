@@ -21,7 +21,7 @@ def append_to_chat_history(user_id: str, message: Dict, CHAT_TTL_SECONDS: int = 
     history = get_chat_history(user_id)
     history.append(message)
     key = get_chat_key(user_id)
-    redis_client.set(key, json.dumps(history))
+    redis_client.set(key, json.dumps(history, indent=4, sort_keys=True, default=str))
     redis_client.expire(key, CHAT_TTL_SECONDS)
 
 def clear_chat_history(user_id: str):
