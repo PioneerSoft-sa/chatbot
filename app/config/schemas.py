@@ -3,7 +3,7 @@ from datetime import date, datetime
 from typing import Optional, List
 from decimal import Decimal
 
-# Base schemas
+# ======== Schema for Employee ========= #
 class EmployeeBase(BaseModel):
     name: str
     email: str
@@ -20,6 +20,7 @@ class Employee(EmployeeBase):
     class Config:
         from_attributes = True
 
+# ========= Schema for Department ========= #
 class DepartmentBase(BaseModel):
     name: str
 
@@ -33,6 +34,7 @@ class Department(DepartmentBase):
     class Config:
         from_attributes = True
 
+# ========= Schema for Product ========= #
 class ProductBase(BaseModel):
     name: str
     category: Optional[str] = None
@@ -47,6 +49,7 @@ class Product(ProductBase):
     class Config:
         from_attributes = True
 
+# ========= Schema for Batch ========= #
 class BatchBase(BaseModel):
     batch_code: str
     quantity: int
@@ -67,6 +70,7 @@ class Batch(BatchBase):
     class Config:
         from_attributes = True
 
+# ========= Schema for Batch Tracking ========= #
 class BatchTrackingBase(BaseModel):
     location: str
     status: str
@@ -83,8 +87,81 @@ class BatchTracking(BatchTrackingBase):
     
     class Config:
         from_attributes = True
+        
+# ========= Schema for Asset ========= #
+class AssetBase(BaseModel):
+    asset_tag: str
+    name: str
+    category: Optional[str] = None
+    location: Optional[str] = None
+    purchase_date: Optional[date] = None
+    warranty_until: Optional[date] = None
+    assigned_to: Optional[int] = None
+    department_id: Optional[int] = None
+    status: Optional[str] = "IN_USE"
 
-# Query schemas
+class AssetCreate(AssetBase):
+    pass
+
+class Asset(AssetBase):
+    id: int
+
+    class Config:
+        from_attributes = True
+        
+# ========= Schema for Maintenance Log ========= #
+class MaintenanceLogBase(BaseModel):
+    asset_id: int
+    reported_by: int
+    description: str
+    status: Optional[str] = "REPORTED"
+    assigned_employee_id: Optional[int] = None
+    assigned_vendor_id: Optional[int] = None
+    resolved_date: Optional[date] = None
+
+class MaintenanceLogCreate(MaintenanceLogBase):
+    pass
+
+class MaintenanceLog(MaintenanceLogBase):
+    id: int
+
+    class Config:
+        from_attributes = True
+
+# ========= Schema for Vendor ========= #
+class VendorBase(BaseModel):
+    name: str
+    contact_person: Optional[str] = None
+    email: str
+    phone: Optional[str] = None
+    address: Optional[str] = None
+
+class VendorCreate(VendorBase):
+    pass
+
+class Vendor(VendorBase):
+    id: int
+
+    class Config:
+        from_attributes = True
+        
+# ========= Schema for AssetVendorLink ========= #
+class AssetVendorLinkBase(BaseModel):
+    asset_id: int
+    vendor_id: int
+    service_type: Optional[str] = None
+    last_service_date: Optional[date] = None
+
+class AssetVendorLinkCreate(AssetVendorLinkBase):
+    pass
+
+class AssetVendorLink(AssetVendorLinkBase):
+    id: int
+
+    class Config:
+        from_attributes = True
+
+# ========= Schema for Chat ========= #
 class ChatQuery(BaseModel):
     query: str
 

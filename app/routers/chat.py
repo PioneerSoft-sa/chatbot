@@ -28,7 +28,7 @@ async def get_chat():
 
 @router.post("/")
 def chat_response(user_input: schemas.ChatQuery, db: Session = Depends(get_db)):
-    results = vector_store.search_schema(user_input.query, n_results=3)
+    results = vector_store.search_schema(user_input.query, n_results=4)
     if not results:
         return {
             "response": {
@@ -37,7 +37,7 @@ def chat_response(user_input: schemas.ChatQuery, db: Session = Depends(get_db)):
             }
         }
 
-    schema_context = "\n".join([f"{r['document'] }, Description: {r['metadata']['description']}" for r in results])
+    schema_context = "\n".join([f"{r['metadata']['schema']}, Description: {r['document']}" for r in results])
 
     prompt = f"""
         You are 'Lark AI', an intelligent chatbot assistant integrated into an organization's dashboard.
