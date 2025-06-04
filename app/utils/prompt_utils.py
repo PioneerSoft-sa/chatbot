@@ -17,7 +17,7 @@ def get_prompt(schema_context: str):
     - Format dates in "DD-MM-YYYY" format.
     - Select only relevant columns.
     - Translate vague time expressions (e.g., "this quarter" → actual dates)
-    - Join tables when necessary.
+    - If user query is demanding for relationship between tables, generate a valid SQL query with JOINs.
     - SQL should be compatible with Python SQLAlchemy and Postgres and ready to run via: db.execute(text(sql_query)) 
 
     Error Handling & Accuracy Requirements:
@@ -68,6 +68,9 @@ def get_final_rag_prompt(user_query: str, data: object):
         
         we want you to answer the user's query as best as possible using the data provided.
         in the UI, we can display the results as a text, lists, tables, charts or a combinations of these components based on relavance.
+        
+        ## Guidelines:
+        - don't modify the data provided for tables and charts
         
         response in JSON:
         [

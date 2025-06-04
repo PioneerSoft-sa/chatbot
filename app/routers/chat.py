@@ -36,10 +36,7 @@ def chat_response(
     results = vector_store.search_schema(user_input.query, n_results=4)
     if not results:
         return {
-            "response": {
-                "type": "need_more_info",
-                "text": "Sorry, I couldn't find any relevant schema information.",
-            }
+            "response": [{"component": "text", "content": "Sorry, I couldn't find any relevant schema information."}]
         }
 
     schema_context = "\n".join([f"{r['metadata']['schema']}, Description: {r['document']}" for r in results])
@@ -57,7 +54,7 @@ def chat_response(
             messages.append(AIMessage(content= json.dumps(message["content"])))
 
     messages.append(HumanMessage(content=user_input.query))
-    response = model(messages).content
+    response = model.predict_messages(messages).content
     # print(response)
 
     try:
@@ -68,13 +65,18 @@ def chat_response(
             rows = result.fetchall()
             columns = result.keys()
             result_data = [dict(zip(columns, row)) for row in rows]
-            data["result"] = result_data
+            data = [
+                {"component": "text", "content": data["text"] if len(result_data) else "Sorry, I couldn't find any relevant information."},
+                {"component": data["component"], "content": result_data}
+            ]
             
             if rag:
                 rag_prompt = get_final_rag_prompt(user_input.query, data)
                 print(rag_prompt)
                 response = model.predict(text=rag_prompt)
                 data = json.loads(response)
+        else:
+            data = [{"component": "text", "content": data["text"]}]
 
         # Store the chat history in Redis
         append_to_chat_history(user_id, {"role": "user", "content": user_input.query})
