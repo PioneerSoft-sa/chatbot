@@ -9,7 +9,7 @@ from app.utils import schemas
 from app.config.database import get_db
 from app.config.vector_store import vector_store
 from app.utils.prompt_utils import get_prompt, get_final_rag_prompt
-from app.utils.redis_utils import get_chat_history, append_to_chat_history
+from app.utils.redis_utils import get_chat_history, append_to_chat_history, clear_chat_history
 
 model = init_chat_model("gpt-4.1", model_provider="openai")
 
@@ -72,7 +72,7 @@ def chat_response(
             
             if rag:
                 rag_prompt = get_final_rag_prompt(user_input.query, data)
-                print(rag_prompt)
+                # print(rag_prompt
                 response = model.predict(text=rag_prompt)
                 data = json.loads(response)
         else:
@@ -87,6 +87,10 @@ def chat_response(
     except json.JSONDecodeError:
         raise HTTPException(status_code=500, detail="Model response could not be parsed as JSON")
 
+@router.post("/clear")
+async def clear_chat():
+    clear_chat_history(user_id)
+    return {"message": "Chat history cleared"}
 
 @router.get("/vectors/schemas")
 def get_schemas(id: str = None):
