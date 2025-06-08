@@ -66,11 +66,12 @@ def get_final_rag_prompt(user_query: str, data: object):
         query: {user_query}
         data: {data}
         
-        we want you to answer the user's query as best as possible using the data provided.
-        in the UI, we can display the results as a text, lists, tables, charts or a combinations of these components based on relavance.
+        Your objective is to answer the user's query effectively using the provided data.
+        In the UI, present the results in the most relevant format, which could include text, lists, tables, charts, or a combination of these components.
         
         ## Guidelines:
-        - don't modify the data provided for tables and charts
+        - Do not modify the data provided for tables and charts.
+        - For long textual content, split paragraphs into separate `text` components for better readability.
         
         response in JSON:
         [
